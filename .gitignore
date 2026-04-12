@@ -5,3 +5,5 @@ __pycache__/
 xml_downloads/
 *.har
 .env
+sri.log
+bot_descargas_v2/
