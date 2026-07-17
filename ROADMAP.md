@@ -18,18 +18,19 @@
 
 ---
 
-## Phase 1 — Multi-Company Worker (v0.2.0)
+## Phase 1 — Multi-Company Worker (v0.2.0) ✅ DONE
 
 **Goal**: Convert standalone script into a multi-company worker service.
 
-- [ ] Configuration file/database for multiple companies
-- [ ] Company CRUD management (RUC, SRI credentials, active status)
-- [ ] Proxy rotation support (residential proxies per worker)
-- [ ] Session persistence (reuse SRI cookies between runs)
-- [ ] Rate limiting between SRI queries (min 3 min between companies)
-- [ ] Download queue with priority (latest month first)
-- [ ] Structured logging per company
-- [ ] Health check endpoint
+- [x] Configuration file for multiple companies (`config/companies.json`)
+- [x] Company CRUD management (RUC, SRI credentials, active status)
+- [x] Credential encryption at rest (Fernet AES-128-CBC via `FERNET_KEY`)
+- [x] Session persistence (save/load SRI cookies, 4h validity)
+- [x] Rate limiting between SRI queries (3 min default, configurable)
+- [x] Download statistics per company (`config/stats.json`)
+- [x] Structured per-company logging (console + file)
+- [x] Health check via `--health` CLI flag
+- [x] Password override via env var `SRI_PASSWORD_{RUC}`
 
 **Tag**: `v0.2.0`
 
