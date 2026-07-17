@@ -17,6 +17,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional
 
+from src.crypto import encrypt_password, decrypt_password
+
 
 @dataclass
 class CompanyConfig:
@@ -59,13 +61,19 @@ class CompanyManager:
         for raw in raw_list:
             # Support env var override for password: SRI_PASSWORD_{RUC}
             env_key = f"SRI_PASSWORD_{raw['ruc']}"
-            password = os.environ.get(env_key, raw.get("sri_password_encrypted", ""))
+            stored_password = raw.get("sri_password_encrypted", "")
+
+            # Decrypt stored password (or use env override)
+            if os.environ.get(env_key):
+                password = os.environ[env_key]
+            else:
+                password = decrypt_password(stored_password)
 
             company = CompanyConfig(
                 company_id=raw.get("company_id", raw["ruc"]),
                 ruc=raw["ruc"],
                 business_name=raw.get("business_name", raw["ruc"]),
-                sri_password_encrypted=password,
+                sri_password_encrypted=password,  # Always plain text in memory
                 is_active=raw.get("is_active", True),
                 download_types=raw.get("download_types", [1, 6]),
                 schedule=raw.get("schedule", "daily"),
@@ -126,7 +134,7 @@ class CompanyManager:
                 "company_id": c.company_id,
                 "ruc": c.ruc,
                 "business_name": c.business_name,
-                "sri_password_encrypted": c.sri_password_encrypted,
+                "sri_password_encrypted": encrypt_password(c.sri_password_encrypted),
                 "is_active": c.is_active,
                 "download_types": c.download_types,
                 "schedule": c.schedule,

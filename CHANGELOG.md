@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.2.0] — 2026-07-17
+
+### Added
+
+- `src/company_manager.py` — Multi-company CRUD from JSON config
+- `src/crypto.py` — Fernet (AES-128-CBC) credential encryption at rest
+- `src/rate_limiter.py` — Configurable rate limiting between SRI queries (3 min default)
+- `src/session_store.py` — Browser cookie persistence for session reuse
+- `src/stats_tracker.py` — Download statistics per company (JSON persistence)
+- `src/logger.py` — Structured per-company logging (console + file)
+- `src/orchestrator.py` — Multi-company orchestrator with `--health` check
+- `config/companies.json` — Sample company configuration file
+- Password encryption: `FERNET_KEY` env var enables AES encryption of stored credentials
+- Health check: `python -m src.orchestrator --health` for operational monitoring
+
+---
+
 ## [0.1.0] — 2026-07-17
 
 ### Added

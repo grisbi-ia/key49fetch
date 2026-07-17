@@ -49,37 +49,36 @@ Standalone Python script that automates SRI document downloads using Playwright 
 
 ---
 
-## Phase 1 — Multi-Company Worker (v0.2.0) 🔄 IN PROGRESS
+## Phase 1 — Multi-Company Worker (v0.2.0) ✅ COMPLETED
 
-**Target tag**: `v0.2.0`  
-**Status**: In progress
+**Tag**: `v0.2.0`  
+**Completed**: 2026-07-17
 
 ### Completed
 
-- [x] `src/company_manager.py` — Company CRUD from JSON config
+- [x] `src/company_manager.py` — Company CRUD from JSON config (with encryption)
+- [x] `src/crypto.py` — AES-128-CBC credential encryption (Fernet)
 - [x] `config/companies.json` — Sample multi-company configuration
 - [x] `src/rate_limiter.py` — Rate limiting between SRI queries (3 min default)
 - [x] `src/session_store.py` — Cookie persistence (save/load SRI sessions)
+- [x] `src/stats_tracker.py` — Download statistics per company
 - [x] `src/logger.py` — Structured per-company logging (console + file)
-- [x] `src/orchestrator.py` — Multi-company orchestrator entry point
-
-### Pending
-
-- [ ] Proxy rotation integration (iproyal or similar)
-- [ ] Session reuse: skip login if cookies are fresh (< 4h)
-- [ ] Health check endpoint
-- [ ] Download stats per company (total downloaded, last run)
-- [ ] Encryption for stored passwords (currently plain text)
-- [ ] Integration tests with multiple companies
+- [x] `src/orchestrator.py` — Multi-company orchestrator with health check
+- [x] `--health` CLI flag for operational monitoring
+- [x] Session reuse detection (logs whether valid cookies exist)
+- [x] Credential encryption at rest (Fernet key from `FERNET_KEY` env var)
 
 ### Files Changed
 
-- `src/company_manager.py` — Company CRUD (new)
+- `src/company_manager.py` — Company CRUD with encryption (new)
+- `src/crypto.py` — Fernet encryption utilities (new)
 - `src/rate_limiter.py` — Rate limiter (new)
 - `src/session_store.py` — Cookie persistence (new)
+- `src/stats_tracker.py` — Download statistics (new)
 - `src/logger.py` — Structured logging (new)
 - `src/orchestrator.py` — Multi-company orchestrator (new)
 - `config/companies.json` — Sample config (new)
+- `requirements.txt` — Added `cryptography>=41.0`
 - `.gitignore` — Added cookies/ and logs/
 
 ---

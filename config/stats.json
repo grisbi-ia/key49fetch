@@ -1,0 +1,16 @@
+{
+  "0195160252001": {
+    "company_id": "0195160252001",
+    "ruc": "0195160252001",
+    "business_name": "Test",
+    "total_downloaded": 5,
+    "total_skipped": 2,
+    "total_errors": 0,
+    "last_run_at": "2026-07-17T21:37:04.533178+00:00",
+    "last_run_status": "ok",
+    "last_run_duration_seconds": 45.0,
+    "months_processed": [
+      "2026-04"
+    ]
+  }
+}
