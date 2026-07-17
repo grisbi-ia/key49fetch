@@ -49,26 +49,38 @@ Standalone Python script that automates SRI document downloads using Playwright 
 
 ---
 
-## Phase 1 — Multi-Company Worker (v0.2.0) 🔜 NEXT
+## Phase 1 — Multi-Company Worker (v0.2.0) 🔄 IN PROGRESS
 
 **Target tag**: `v0.2.0`  
-**Status**: Not started
+**Status**: In progress
 
-### Planned Work
+### Completed
 
-1. Design `companies` database table (PostgreSQL)
-2. Implement company registration (RUC, encrypted SRI password, active flag)
-3. Worker loop: iterate companies, download current month, skip already-processed
-4. Proxy rotation integration (iproyal or similar)
-5. Structured logging per company
-6. Rate limiting: minimum 3-minute gap between SRI queries
-7. Health check endpoint
+- [x] `src/company_manager.py` — Company CRUD from JSON config
+- [x] `config/companies.json` — Sample multi-company configuration
+- [x] `src/rate_limiter.py` — Rate limiting between SRI queries (3 min default)
+- [x] `src/session_store.py` — Cookie persistence (save/load SRI sessions)
+- [x] `src/logger.py` — Structured per-company logging (console + file)
+- [x] `src/orchestrator.py` — Multi-company orchestrator entry point
 
-### Open Questions
+### Pending
 
-- Database: PostgreSQL (via Quarkus) or SQLite for standalone mode?
-- Proxy: residential rotating or datacenter static?
-- Worker: single process with async loop or multiple processes?
+- [ ] Proxy rotation integration (iproyal or similar)
+- [ ] Session reuse: skip login if cookies are fresh (< 4h)
+- [ ] Health check endpoint
+- [ ] Download stats per company (total downloaded, last run)
+- [ ] Encryption for stored passwords (currently plain text)
+- [ ] Integration tests with multiple companies
+
+### Files Changed
+
+- `src/company_manager.py` — Company CRUD (new)
+- `src/rate_limiter.py` — Rate limiter (new)
+- `src/session_store.py` — Cookie persistence (new)
+- `src/logger.py` — Structured logging (new)
+- `src/orchestrator.py` — Multi-company orchestrator (new)
+- `config/companies.json` — Sample config (new)
+- `.gitignore` — Added cookies/ and logs/
 
 ---
 

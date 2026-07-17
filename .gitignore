@@ -3,6 +3,8 @@ __pycache__/
 *.pyc
 *.pyo
 xml_downloads/
+cookies/
+logs/*.log
 *.har
 .env
 sri.log

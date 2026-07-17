@@ -1,0 +1,12 @@
+[
+    {
+        "company_id": "0195160252001",
+        "ruc": "0195160252001",
+        "business_name": "AuraCore Systems",
+        "sri_password_encrypted": "AuraSRI2025#",
+        "is_active": true,
+        "download_types": [1, 6],
+        "schedule": "daily",
+        "proxy_profile": null
+    }
+]
