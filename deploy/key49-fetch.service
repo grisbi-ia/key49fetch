@@ -1,13 +1,13 @@
 [Unit]
 Description=Key49-Fetch SRI Document Download Worker
-Documentation=https://github.com/auracore/key49-fetch
+Documentation=https://github.com/grisbi-ia/key49fetch
 After=network-online.target
 Wants=network-online.target
 
 [Service]
 Type=oneshot
-User=key49
-Group=key49
+User=app
+Group=app
 WorkingDirectory=/opt/key49-fetch
 EnvironmentFile=/opt/key49-fetch/.env
 ExecStart=/opt/key49-fetch/.venv/bin/python -m src.orchestrator \

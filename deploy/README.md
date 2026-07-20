@@ -8,55 +8,55 @@ The recommended deployment uses systemd for scheduling and process supervision.
 
 ```bash
 # 1. Create service user
-sudo useradd -r -s /bin/false key49
+useradd -r -s /bin/false app
 
 # 2. Deploy application
-sudo mkdir -p /opt/key49-fetch /data/key49-fetch/xml_downloads
-sudo cp -r . /opt/key49-fetch/
-sudo chown -R key49:key49 /opt/key49-fetch /data/key49-fetch
+mkdir -p /opt/app-fetch /data/app-fetch/xml_downloads
+cp -r . /opt/app-fetch/
+chown -R app:app /opt/app-fetch /data/app-fetch
 
 # 3. Set up Python venv
-cd /opt/key49-fetch
-sudo -u key49 python3 -m venv .venv
-sudo -u key49 .venv/bin/pip install -r requirements.txt
-sudo -u key49 .venv/bin/playwright install firefox
+cd /opt/app-fetch
+-u app python3 -m venv .venv
+-u app .venv/bin/pip install -r requirements.txt
+-u app .venv/bin/playwright install firefox
 
 # 4. Configure environment
-sudo -u key49 cp .env.example .env
-sudo -u key49 $EDITOR .env   # Set FERNET_KEY, etc.
+-u app cp .env.example .env
+-u app $EDITOR .env   # Set FERNET_KEY, etc.
 
 # 5. Install systemd units
-sudo cp deploy/key49-fetch.service /etc/systemd/system/
-sudo cp deploy/key49-fetch.timer /etc/systemd/system/
-sudo systemctl daemon-reload
+cp deploy/app-fetch.service /etc/systemd/system/
+cp deploy/app-fetch.timer /etc/systemd/system/
+systemctl daemon-reload
 
 # 6. Enable and start timer
-sudo systemctl enable key49-fetch.timer
-sudo systemctl start key49-fetch.timer
+systemctl enable app-fetch.timer
+systemctl start app-fetch.timer
 ```
 
 ### Operations
 
 ```bash
 # Check timer status
-systemctl status key49-fetch.timer
-systemctl list-timers key49-fetch.timer
+systemctl status app-fetch.timer
+systemctl list-timers app-fetch.timer
 
 # Trigger a manual run
-sudo systemctl start key49-fetch.service
+systemctl start app-fetch.service
 
 # View logs
-journalctl -u key49-fetch.service -f
-journalctl -u key49-fetch.service --since "1 hour ago"
+journalctl -u app-fetch.service -f
+journalctl -u app-fetch.service --since "1 hour ago"
 
 # Run health check
-cd /opt/key49-fetch && sudo -u key49 .venv/bin/python -m src.orchestrator --health
+cd /opt/app-fetch && -u app .venv/bin/python -m src.orchestrator --health
 
 # Run for a specific company only
-sudo -u key49 .venv/bin/python -m src.orchestrator --companies 0195160252001
+-u app .venv/bin/python -m src.orchestrator --companies 0195160252001
 
 # Run for a specific month
-sudo -u key49 .venv/bin/python -m src.orchestrator --year 2026 --month 7
+-u app .venv/bin/python -m src.orchestrator --year 2026 --month 7
 ```
 
 ### Horizontal Scaling (Multiple Instances)
@@ -83,7 +83,7 @@ because:
 
 Default: every 6 hours (00:15, 06:15, 12:15, 18:15) with ±5 min randomization.
 
-To change: edit `deploy/key49-fetch.timer` → `OnCalendar=` → copy to `/etc/systemd/system/` → `systemctl daemon-reload`.
+To change: edit `deploy/app-fetch.timer` → `OnCalendar=` → copy to `/etc/systemd/system/` → `systemctl daemon-reload`.
 
 ### Monitoring
 
@@ -92,11 +92,11 @@ To change: edit `deploy/key49-fetch.timer` → `OnCalendar=` → copy to `/etc/s
 python -m src.orchestrator --health
 
 # Check download stats per company
-cat /opt/key49-fetch/config/stats.json | python -m json.tool
+cat /opt/app-fetch/config/stats.json | python -m json.tool
 
 # Check logs per company
-ls /opt/key49-fetch/logs/
-tail -f /opt/key49-fetch/logs/0195160252001.log
+ls /opt/app-fetch/logs/
+tail -f /opt/app-fetch/logs/0195160252001.log
 ```
 
 ---
@@ -109,22 +109,22 @@ The REST API can be deployed alongside the download worker.
 
 ```bash
 # Add API dependencies
-sudo -u key49 /opt/key49-fetch/.venv/bin/pip install fastapi uvicorn
+-u app /opt/app-fetch/.venv/bin/pip install fastapi uvicorn
 
 # Create systemd service for the API
-sudo cp deploy/key49-fetch-api.service /etc/systemd/system/
-sudo systemctl daemon-reload
-sudo systemctl enable --now key49-fetch-api.service
+cp deploy/app-fetch-api.service /etc/systemd/system/
+systemctl daemon-reload
+systemctl enable --now app-fetch-api.service
 ```
 
 ### Configure
 
 ```bash
 # Set API keys (comma-separated)
-echo "API_KEYS=your-secret-key-1,your-secret-key-2" >> /opt/key49-fetch/.env
+echo "API_KEYS=your-secret-key-1,your-secret-key-2" >> /opt/app-fetch/.env
 
 # Optional: change port
-echo "KEY49_API_PORT=8081" >> /opt/key49-fetch/.env
+echo "KEY49_API_PORT=8081" >> /opt/app-fetch/.env
 ```
 
 ### API Endpoints
@@ -165,7 +165,7 @@ Add webhook per company in `config/companies.json`:
     "download_types": [1, 6],
     "schedule": "daily",
     "proxy_profile": null,
-    "webhook_url": "https://erp.example.com/api/webhooks/key49",
+    "webhook_url": "https://erp.example.com/api/webhooks/app",
     "webhook_secret": "your-hmac-secret-here"
 }
 ```

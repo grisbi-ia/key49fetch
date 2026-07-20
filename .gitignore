@@ -10,3 +10,4 @@ logs/webhooks/
 .env
 sri.log
 bot_descargas_v2/
+*.tar.gz
