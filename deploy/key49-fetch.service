@@ -6,8 +6,8 @@ Wants=network-online.target
 
 [Service]
 Type=oneshot
-User=app
-Group=app
+User=root
+Group=root
 WorkingDirectory=/opt/key49-fetch
 EnvironmentFile=/opt/key49-fetch/.env
 ExecStart=/opt/key49-fetch/.venv/bin/python -m src.orchestrator \

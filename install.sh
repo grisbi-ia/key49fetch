@@ -16,7 +16,7 @@ if [ "$(id -u)" -ne 0 ]; then
 fi
 
 # ─── Configuración (editar si es necesario) ──────────────────────
-SERVICE_USER="app"
+# No service user needed — runs as root
 INSTALL_DIR="/opt/key49-fetch"
 DATA_DIR="/data/key49-fetch"
 REPO_URL="git@github.com:grisbi-ia/key49fetch.git"
@@ -36,11 +36,7 @@ info "Python $(python3 --version)"
 info "Git $(git --version)"
 
 # ─── 2. Crear usuario de servicio ───────────────────────────────
-if ! id -u "$SERVICE_USER" >/dev/null 2>&1; then
-    useradd -r -s /bin/false "$SERVICE_USER"
-    info "Usuario '$SERVICE_USER' creado"
 else
-    info "Usuario '$SERVICE_USER' ya existe"
 fi
 
 # ─── 3. Crear directorios ───────────────────────────────────────
@@ -49,7 +45,6 @@ info "Directorio de datos: $DATA_DIR"
 
 # ─── 4. Clonar repositorio ──────────────────────────────────────
 if [ -d "$INSTALL_DIR/.git" ]; then
-    info "Repositorio ya existe, actualizando..."
     cd "$INSTALL_DIR"
     git pull origin master
 else
@@ -94,12 +89,9 @@ ENABLE_DOCS=1
 EOF
     info ".env creado con FERNET_KEY generada"
 else
-    info ".env ya existe, se conserva"
 fi
 
 # ─── 8. Ajustar permisos ───────────────────────────────────────
-chown -R "$SERVICE_USER":"$SERVICE_USER" "$INSTALL_DIR" "$DATA_DIR"
-info "Permisos ajustados (usuario: $SERVICE_USER)"
 
 # ─── 9. Instalar servicios systemd ──────────────────────────────
 sed -i "s|/opt/key49-fetch|$INSTALL_DIR|g" deploy/key49-fetch.service

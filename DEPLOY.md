@@ -65,7 +65,7 @@ tar -xzf key49fetch.tar.gz -C key49fetch
 cd key49fetch
 
 # Crear usuario de servicio
-useradd -r -s /bin/false app 2>/dev/null || true
+# No se necesita usuario adicional — todo corre como root 2>/dev/null || true
 
 # Crear directorio de datos
 mkdir -p /data/key49-fetch/xml_downloads
@@ -80,7 +80,7 @@ python3 -m venv .venv
 # Copiar el resultado y crear .env (ver sección 4)
 
 # Permisos
-chown -R app:app /opt/key49-fetch /data/key49-fetch
+# Sin permisos especiales — root es dueño de todo /opt/key49-fetch /data/key49-fetch
 
 # Instalar servicios
 cp deploy/key49-fetch.service /etc/systemd/system/
@@ -99,7 +99,7 @@ Si prefieres control total, sigue estos pasos como **root**:
 
 ```bash
 # ─── 3.1. Crear usuario de servicio ────────────────────────────
-useradd -r -s /bin/false app
+# No se necesita usuario adicional — todo corre como root
 
 # ─── 3.2. Crear directorios ────────────────────────────────────
 mkdir -p /opt/key49-fetch /data/key49-fetch/xml_downloads
@@ -120,7 +120,7 @@ python3 -m venv .venv
 # .venv/bin/playwright install firefox
 
 # ─── 3.6. Permisos ─────────────────────────────────────────────
-chown -R app:app /opt/key49-fetch /data/key49-fetch
+# Sin permisos especiales — root es dueño de todo /opt/key49-fetch /data/key49-fetch
 ```
 
 ---
