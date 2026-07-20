@@ -122,10 +122,26 @@ Editar `config/companies.json`:
 
 ---
 
-## 5. Primera ejecución (prueba manual)
+## 5. Primera descarga (bajo demanda)
+
+> ⚠️ **Importante**: Registrar un RUC en `companies.json` NO dispara descargas automáticas.
+> La primera descarga debe solicitarse manualmente vía API o CLI.
+> Luego el timer (systemd) continúa descargando periódicamente.
 
 ```bash
-# ─── 5.1. Modo visible (ver el navegador) ─────────────────────
+# ─── 5.1. Vía API (recomendado) ─────────────────────────────────
+# Asegúrate que la API esté corriendo:
+sudo -u key49 .venv/bin/python -m src.api.app &
+
+# Disparar descarga para el mes corriente:
+curl -X POST \
+  "http://localhost:8081/api/v1/fetch?company_id=0195160252001"
+
+# Con mes específico:
+curl -X POST \
+  "http://localhost:8081/api/v1/fetch?company_id=0195160252001&year=2026&month=4"
+
+# ─── 5.2. Vía CLI (alternativa) ─────────────────────────────────
 # Si tienes display (entorno gráfico):
 sudo -u key49 .venv/bin/python -m src.orchestrator \
     --companies 0195160252001 \
@@ -216,7 +232,21 @@ curl http://localhost:8081/api/v1/companies
 curl "http://localhost:8081/api/v1/documents?company_id=0195160252001&year=2026&month=7"
 curl "http://localhost:8081/api/v1/documents/{clave_acceso}?company_id=0195160252001&year=2026&month=7&type=1&format=xml" -o factura.xml
 
-# ─── 7.3. Dashboard web ────────────────────────────────────────
+# ─── 7.3. Disparar descarga bajo demanda ────────────────────────
+# Registrar un RUC NO dispara descarga automática.
+# Usa este endpoint para la descarga inicial:
+curl -X POST -H "X-API-Key: my-key" \
+  "http://localhost:8081/api/v1/fetch?company_id=0195160252001"
+
+# Consultar estado del job:
+curl -H "X-API-Key: my-key" \
+  "http://localhost:8081/api/v1/fetch/{job_id}"
+
+# Listar últimos jobs:
+curl -H "X-API-Key: my-key" \
+  "http://localhost:8081/api/v1/fetch"
+
+# ─── 7.4. Dashboard web ────────────────────────────────────────
 # Abrir en navegador: http://IP-DEL-SERVIDOR:8081/
 ```
 
