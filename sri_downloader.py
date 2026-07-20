@@ -562,18 +562,18 @@ async def download_xmls(
             await page.wait_for_load_state("networkidle")
             human_delay(2, 4)
 
-            # Esperar activamente a que termine la redirección Keycloak → SRI
-            print("   ⏳ Esperando redirección post-login...")
-            for _ in range(30):  # hasta 90s
-                await page.wait_for_timeout(3000)
-                url = page.url
-                # Keycloak URLs have /auth/realms/ — we need to be PAST that
-                if "/auth/realms/" in url:
-                    continue
-                if "sri-en-linea" in url or "tuportal-internet" in url:
-                    break
-            await page.wait_for_load_state("networkidle")
-            print(f"   ✅ Login completado → {page.url[-80:]}")
+            # En Contabo, la redirección Keycloak → SRI puede colgarse.
+            # Las cookies ya están establecidas — navegamos directo al portal.
+            print("   🍪 Sesión establecida, navegando al portal SRI...")
+            await page.goto(
+                "https://srienlinea.sri.gob.ec/sri-en-linea/contribuyente/perfil",
+                wait_until="domcontentloaded", timeout=30000
+            )
+            human_delay(2, 3)
+            if "/auth/realms/" in page.url:
+                print("   ⚠️  No se pudo establecer sesión — credenciales incorrectas o SRI no disponible")
+            else:
+                print(f"   ✅ Sesión activa → {page.url[-60:]}")
         else:
             print("   Inicia sesión con tu RUC y clave en el navegador.")
             print("   ⏳ Esperando login manual...")
@@ -1270,15 +1270,12 @@ async def download_xmls(
                         continue
                 await page.wait_for_load_state("networkidle")
                 human_delay(2, 4)
-                # Esperar redirección Keycloak → SRI
-                for _ in range(30):
-                    await page.wait_for_timeout(3000)
-                    url = page.url
-                    if "/auth/realms/" in url:
-                        continue
-                    if "sri-en-linea" in url or "tuportal-internet" in url:
-                        break
-                await page.wait_for_load_state("networkidle")
+                # Navegar directo al portal (cookies ya establecidas)
+                await page.goto(
+                    "https://srienlinea.sri.gob.ec/sri-en-linea/contribuyente/perfil",
+                    wait_until="domcontentloaded", timeout=30000
+                )
+                human_delay(2, 3)
                 print("   ✅ Re-login exitoso")
 
         print(f"\n{'═' * 60}")
