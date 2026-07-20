@@ -652,7 +652,32 @@ async def download_xmls(
             tipo_nombre = TIPO_COMPROBANTE.get(tipo_comprobante, str(tipo_comprobante))
             tipo_select_value = await page.evaluate("""
                 (searchText) => {
-                    const sel = document.getElementById('frmPrincipal:cmbTipoComprobante');
+                    // Try by exact ID first
+                    let sel = document.getElementById('frmPrincipal:cmbTipoComprobante');
+                    // Fallback: any select with TipoComprobante in ID or name
+                    if (!sel) {
+                        const selects = document.querySelectorAll('select');
+                        for (const s of selects) {
+                            if ((s.id || '').toUpperCase().includes('TIPO') ||
+                                (s.name || '').toUpperCase().includes('TIPO')) {
+                                sel = s;
+                                break;
+                            }
+                        }
+                    }
+                    // Last resort: any select with matching options
+                    if (!sel) {
+                        const selects = document.querySelectorAll('select');
+                        for (const s of selects) {
+                            for (let i = 0; i < s.options.length; i++) {
+                                if (s.options[i].text.toUpperCase().includes(searchText)) {
+                                    sel = s;
+                                    break;
+                                }
+                            }
+                            if (sel) break;
+                        }
+                    }
                     if (!sel) return null;
                     const upper = searchText.toUpperCase();
                     for (let i = 0; i < sel.options.length; i++) {
@@ -669,6 +694,26 @@ async def download_xmls(
                 )
                 print(f"   ✅ Tipo: {tipo_nombre} (valor select: {tipo_select_value})")
             else:
+                # Debug: mostrar todos los selects disponibles
+                selects_debug = await page.evaluate("""
+                    () => {
+                        const selects = document.querySelectorAll('select');
+                        const info = [];
+                        for (const s of selects) {
+                            const options = [];
+                            for (let i = 0; i < Math.min(s.options.length, 5); i++) {
+                                options.push(s.options[i].text.trim());
+                            }
+                            info.push({
+                                id: s.id || '(sin id)',
+                                name: s.name || '(sin name)',
+                                options: options
+                            });
+                        }
+                        return info;
+                    }
+                """)
+                print(f"   🔍 Selects en la página: {selects_debug}")
                 print(f"   ❌ No se encontró opción para '{tipo_nombre}' en el select")
                 continue
             human_delay(1, 2)
