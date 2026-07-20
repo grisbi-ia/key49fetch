@@ -31,6 +31,66 @@ El script hace todo: crea usuario `app`, clona repo, instala dependencias, confi
 
 Saltar a [sección 5](#5-primera-descarga-bajo-demanda) para la primera descarga.
 
+### 2.1. Alternativa: subir sin Git (tar.gz)
+
+Si el servidor no tiene Git o no quieres clonar el repo:
+
+**En tu máquina local:**
+
+```bash
+cd /ruta/a/key49fetch
+
+# Excluir lo que no se necesita en producción
+tar -czf key49fetch.tar.gz \
+    --exclude='.venv' \
+    --exclude='.git' \
+    --exclude='__pycache__' \
+    --exclude='*.pyc' \
+    --exclude='bot_descargas_v2' \
+    --exclude='*.tar.gz' \
+    --exclude='xml_downloads' \
+    --exclude='logs' \
+    --exclude='cookies' \
+    .
+
+# Subir al servidor (el método que prefieras):
+scp key49fetch.tar.gz root@TU_SERVIDOR:/opt/
+```
+
+**En el servidor, como root:**
+
+```bash
+cd /opt
+tar -xzf key49fetch.tar.gz -C key49fetch
+cd key49fetch
+
+# Crear usuario de servicio
+useradd -r -s /bin/false app 2>/dev/null || true
+
+# Crear directorio de datos
+mkdir -p /data/key49-fetch/xml_downloads
+
+# Entorno virtual
+python3 -m venv .venv
+.venv/bin/pip install -r requirements.txt
+.venv/bin/playwright install firefox
+
+# Generar FERNET_KEY
+.venv/bin/python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+# Copiar el resultado y crear .env (ver sección 4)
+
+# Permisos
+chown -R app:app /opt/key49-fetch /data/key49-fetch
+
+# Instalar servicios
+cp deploy/key49-fetch.service /etc/systemd/system/
+cp deploy/key49-fetch.timer /etc/systemd/system/
+cp deploy/key49-fetch-api.service /etc/systemd/system/
+systemctl daemon-reload
+systemctl enable --now key49-fetch-api.service
+systemctl enable --now key49-fetch.timer
+```
+
 ---
 
 ## 3. Instalación manual (paso a paso)
