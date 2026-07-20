@@ -623,7 +623,31 @@ async def download_xmls(
                 await page.mouse.wheel(0, random.randint(100, 400))
                 await page.wait_for_timeout(random.randint(200, 600))
             
+            print(f"   🔗 URL final: {page.url}")
             print("📋 Página de búsqueda cargada")
+
+            # ── Esperar a que el formulario JSF esté realmente listo ──
+            try:
+                await page.wait_for_selector(
+                    'select[id*="ano"]',
+                    timeout=15000
+                )
+                print("   ✅ Formulario JSF detectado")
+            except Exception:
+                print("   ⚠️  Formulario JSF no detectado — intentando navegación directa...")
+                # Fallback: ir directo a la página de comprobantes recibidos
+                DIRECT_URL = (
+                    "https://srienlinea.sri.gob.ec/comprobantes-electronicos-internet/"
+                    "pages/consultas/recibidos/comprobantesRecibidos.jsf"
+                )
+                await page.goto(DIRECT_URL, wait_until="domcontentloaded", timeout=30000)
+                human_delay(3, 5)
+                try:
+                    await page.wait_for_selector('select[id*="ano"]', timeout=10000)
+                    print("   ✅ Formulario JSF detectado (vía directa)")
+                except Exception:
+                    page_text = await page.inner_text("body")
+                    print(f"   🔍 Contenido (primeros 300 chars): {page_text[:300]}")
 
             # ── 3. Llenar formulario y hacer clic en Consultar ───────────
             # Seleccionar año
