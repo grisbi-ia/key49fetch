@@ -1178,6 +1178,16 @@ async def download_xmls(
         print(f"📁 Archivos en: {base_out / ruc_folder}")
         print(f"{'═' * 60}")
 
+        return {
+            "status": "failed" if grand_total_errors > 0 and grand_total_downloaded == 0 else (
+                "partial" if grand_total_errors > 0 else "ok"
+            ),
+            "downloaded": grand_total_downloaded,
+            "skipped": grand_total_skipped,
+            "errors": grand_total_errors,
+            "output_dir": str(base_out / ruc_folder),
+        }
+
 
 # ─── CLI ──────────────────────────────────────────────────────────────────────
 

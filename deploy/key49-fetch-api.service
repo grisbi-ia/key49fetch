@@ -1,0 +1,37 @@
+[Unit]
+Description=Key49-Fetch REST API Gateway
+Documentation=https://github.com/auracore/key49-fetch
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=key49
+Group=key49
+WorkingDirectory=/opt/key49-fetch
+EnvironmentFile=/opt/key49-fetch/.env
+ExecStart=/opt/key49-fetch/.venv/bin/python -m src.api.app
+
+# Restart on failure
+Restart=on-failure
+RestartSec=5
+
+# Security hardening
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+ReadWritePaths=/data/key49-fetch /opt/key49-fetch/config /opt/key49-fetch/logs
+ReadOnlyPaths=/opt/key49-fetch
+
+# Resource limits
+MemoryMax=256M
+CPUQuota=100%
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=key49-fetch-api
+
+[Install]
+WantedBy=multi-user.target

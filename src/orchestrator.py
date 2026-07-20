@@ -15,6 +15,7 @@ Standards:
 from __future__ import annotations
 
 import asyncio
+import os
 import random
 import sys
 import time
@@ -30,6 +31,8 @@ from src.rate_limiter import rate_limiter
 from src.session_store import get_session_store
 from src.stats_tracker import get_stats_tracker
 from src.logger import CompanyLogAdapter, get_company_logger, setup_company_logger
+from src.webhooks.dispatcher import dispatch_webhook
+from src.alerting import send_failure_alert, should_alert, ALERT_THRESHOLD
 
 # Import the core download function from the main script
 from sri_downloader import download_xmls, _load_dotenv
@@ -70,6 +73,8 @@ class MultiCompanyOrchestrator:
             month: Target month (defaults to current month).
             company_filter: Optional list of company_ids to process.
                            If None, process all active companies.
+                           Also configurable via COMPANY_FILTER env var
+                           (comma-separated company IDs).
 
         Returns:
             Dict mapping company_id to result summary.
@@ -78,9 +83,18 @@ class MultiCompanyOrchestrator:
         year = year or now.year
         month = month or now.month
 
+        # Resolve company filter: CLI arg > env var > all active
+        if company_filter is None:
+            env_filter = os.environ.get("COMPANY_FILTER", "").strip()
+            if env_filter:
+                company_filter = [c.strip() for c in env_filter.split(",") if c.strip()]
+
         companies = self._company_manager.active_companies
         if company_filter:
             companies = [c for c in companies if c.company_id in company_filter]
+            if not companies:
+                print(f"⚠️  No active companies match filter: {company_filter}")
+                return {}
 
         if not companies:
             print("⚠️  No active companies found.")
@@ -146,6 +160,14 @@ class MultiCompanyOrchestrator:
                 ruc=company.ruc,
                 business_name=company.business_name,
             )
+
+            # Record failure and check alert threshold
+            if company_result.get("status") == "max_retries_exceeded":
+                self._stats_tracker.record_failure(
+                    company_id=company_id,
+                    error=f"Max retries ({self._max_retries}) exhausted",
+                )
+                await self._check_and_alert(company, log)
             
             log.info(
                 f"{status} Done in {duration:.0f}s: "
@@ -153,6 +175,29 @@ class MultiCompanyOrchestrator:
                 f"{company_result.get('skipped', 0)} skipped, "
                 f"{company_result.get('errors', 0)} errors"
             )
+
+            # ── Webhook notification ──────────────────────────────────────
+            new_docs = company_result.get("downloaded", 0)
+            total_docs = new_docs + company_result.get("skipped", 0)
+            period = f"{year}-{month:02d}"
+
+            if company.webhook_url and new_docs > 0:
+                log.info(f"📨 Sending webhook to {company.webhook_url}")
+                delivered = await dispatch_webhook(
+                    url=company.webhook_url,
+                    secret=company.webhook_secret or "",
+                    company_id=company_id,
+                    ruc=company.ruc,
+                    period=period,
+                    new_documents=new_docs,
+                    total_documents=total_docs,
+                )
+                if delivered:
+                    log.info(f"📨 Webhook delivered successfully")
+                else:
+                    log.warning(f"📨 Webhook delivery failed (check logs/webhooks/)")
+            elif company.webhook_url and new_docs == 0:
+                log.info(f"📨 Skipping webhook — no new documents")
 
         # Grand total
         total_down = sum(r.get("downloaded", 0) for r in results.values())
@@ -201,7 +246,7 @@ class MultiCompanyOrchestrator:
                     f"period={year}-{month:02d}, attempt={attempt}"
                 )
 
-                await download_xmls(
+                result = await download_xmls(
                     ano=year,
                     mes=month,
                     tipos_comprobante=company.download_types,
@@ -211,18 +256,40 @@ class MultiCompanyOrchestrator:
                     headless=self._headless,
                 )
 
-                # If we get here without exception, it worked
-                log.info(f"Download completed successfully")
-                return {
-                    "status": "ok",
-                    "downloaded": 0,  # Updated below
-                    "skipped": 0,
-                    "errors": 0,
-                    "attempts": attempt,
-                }
+                # Use actual counts returned by download_xmls
+                if result is None:
+                    result = {"status": "ok", "downloaded": 0, "skipped": 0, "errors": 0}
+
+                log.info(
+                    f"Download completed — "
+                    f"status={result.get('status')}, "
+                    f"new={result.get('downloaded', 0)}, "
+                    f"skipped={result.get('skipped', 0)}, "
+                    f"errors={result.get('errors', 0)}"
+                )
+
+                total_downloaded += result.get("downloaded", 0)
+                total_skipped += result.get("skipped", 0)
+                total_errors += result.get("errors", 0)
+
+                # If no errors or partial success, consider done
+                if result.get("status") != "failed":
+                    return {
+                        "status": result.get("status", "ok"),
+                        "downloaded": total_downloaded,
+                        "skipped": total_skipped,
+                        "errors": total_errors,
+                        "attempts": attempt,
+                    }
+                # If failed but has retries left, continue loop
+                log.warning(
+                    f"Download returned failed status, "
+                    f"will retry ({attempt}/{self._max_retries})"
+                )
 
             except Exception as e:
-                log.error(f"Download failed: {e}")
+                log.error(f"Download crashed: {e}")
+                total_errors += 1
 
         return {
             "status": "max_retries_exceeded",
@@ -231,6 +298,102 @@ class MultiCompanyOrchestrator:
             "errors": total_errors,
             "attempts": self._max_retries,
         }
+
+    async def _check_and_alert(
+        self,
+        company: CompanyConfig,
+        log: CompanyLogAdapter,
+    ) -> None:
+        """Check if company has exceeded failure threshold and send alert."""
+        should, consecutive, last_err = should_alert(company.company_id)
+        if should:
+            log.warning(
+                f"🚨 Alert threshold reached: {consecutive} consecutive failures "
+                f"(threshold={ALERT_THRESHOLD})"
+            )
+            sent = await send_failure_alert(
+                company_id=company.company_id,
+                ruc=company.ruc,
+                business_name=company.business_name,
+                consecutive_failures=consecutive,
+                last_error=last_err,
+            )
+            if sent:
+                log.info(f"🚨 Alert sent")
+            else:
+                log.warning(f"🚨 Alert not sent (no ALERT_WEBHOOK_URL configured)")
+
+    async def backfill(
+        self,
+        start_year: int,
+        start_month: int,
+        end_year: int,
+        end_month: int,
+        company_filter: Optional[list[str]] = None,
+    ) -> dict[str, dict]:
+        """Download documents for a range of months (historical backfill).
+
+        Useful when onboarding a new company: downloads all past months
+        from the start date to the end date.
+
+        Args:
+            start_year: First year to download.
+            start_month: First month (1-12).
+            end_year: Last year to download.
+            end_month: Last month (1-12).
+            company_filter: Optional list of company_ids.
+
+        Returns:
+            Nested dict: {company_id: {period: result}}.
+        """
+        results: dict[str, dict] = {}
+
+        # Generate month list
+        months = []
+        y, m = start_year, start_month
+        while (y < end_year) or (y == end_year and m <= end_month):
+            months.append((y, m))
+            m += 1
+            if m > 12:
+                m = 1
+                y += 1
+
+        print(f"\n{'═' * 60}")
+        print(f"📅 Backfill mode: {len(months)} months")
+        print(f"   From: {start_year}-{start_month:02d}")
+        print(f"   To:   {end_year}-{end_month:02d}")
+        print(f"{'═' * 60}")
+
+        for period_idx, (year, month) in enumerate(months):
+            period = f"{year}-{month:02d}"
+            print(f"\n{'─' * 60}")
+            print(f"📆 Period {period_idx + 1}/{len(months)}: {period}")
+            print(f"{'─' * 60}")
+
+            period_results = await self.run(
+                year=year,
+                month=month,
+                company_filter=company_filter,
+            )
+
+            for company_id, result in period_results.items():
+                if company_id not in results:
+                    results[company_id] = {}
+                results[company_id][period] = result
+
+        # Summary
+        total_periods = len(months)
+        total_docs = sum(
+            r.get("downloaded", 0)
+            for cr in results.values()
+            for r in cr.values()
+        )
+        print(f"\n{'═' * 60}")
+        print(f"🎉 BACKFILL COMPLETE")
+        print(f"   Periods: {total_periods} | Documents: {total_docs}")
+        print(f"{'═' * 60}")
+
+        return results
 
 
     def health_check(self) -> dict:
@@ -289,8 +452,9 @@ async def main() -> None:
         help="Target month (default: current month)",
     )
     parser.add_argument(
-        "--company", type=str, default=None,
-        help="Process only this company_id (default: all active)",
+        "--companies", type=str, default=None,
+        help="Comma-separated company IDs to process (default: all active). "
+             "Also configurable via COMPANY_FILTER env var.",
     )
     parser.add_argument(
         "--config", type=str, default="config/companies.json",
@@ -312,6 +476,11 @@ async def main() -> None:
         "--health", action="store_true", default=False,
         help="Show health check report and exit",
     )
+    parser.add_argument(
+        "--backfill", type=str, default=None, metavar="YYYY-MM",
+        help="Backfill mode: download from START-MONTH to current month. "
+             "Example: --backfill 2026-01 downloads Jan 2026 to now.",
+    )
 
     args = parser.parse_args()
 
@@ -328,7 +497,32 @@ async def main() -> None:
         print(_json.dumps(health, indent=2, ensure_ascii=False, default=str))
         return
 
-    company_filter = [args.company] if args.company else None
+    # Resolve company filter: --companies flag or COMPANY_FILTER env var
+    if args.companies:
+        company_filter = [c.strip() for c in args.companies.split(",") if c.strip()]
+    else:
+        company_filter = None  # Let orchestrator check env var
+
+    # ── Backfill mode ────────────────────────────────────────────────────
+    if args.backfill:
+        try:
+            parts = args.backfill.strip().split("-")
+            start_year = int(parts[0])
+            start_month = int(parts[1])
+        except (ValueError, IndexError):
+            print(f"❌ Invalid --backfill format: {args.backfill}")
+            print("   Use YYYY-MM (e.g., --backfill 2026-01)")
+            sys.exit(1)
+
+        now = datetime.now(timezone.utc)
+        await orchestrator.backfill(
+            start_year=start_year,
+            start_month=start_month,
+            end_year=args.year or now.year,
+            end_month=args.month or now.month,
+            company_filter=company_filter,
+        )
+        return
 
     await orchestrator.run(
         year=args.year,

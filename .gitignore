@@ -5,6 +5,7 @@ __pycache__/
 xml_downloads/
 cookies/
 logs/*.log
+logs/webhooks/
 *.har
 .env
 sri.log

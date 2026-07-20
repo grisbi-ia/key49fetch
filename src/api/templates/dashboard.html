@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Key49-Fetch Dashboard</title>
+    <style>
+        :root {
+            --bg: #0f1117;
+            --card-bg: #1a1d27;
+            --border: #2a2d3a;
+            --text: #e1e4eb;
+            --text-muted: #8b8fa3;
+            --green: #22c55e;
+            --yellow: #eab308;
+            --red: #ef4444;
+            --blue: #3b82f6;
+            --accent: #6366f1;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            padding: 2rem;
+        }
+        .header {
+            display: flex; justify-content: space-between; align-items: center;
+            margin-bottom: 2rem; padding-bottom: 1rem; border-bottom: 1px solid var(--border);
+        }
+        .header h1 { font-size: 1.5rem; font-weight: 600; }
+        .header .version { color: var(--text-muted); font-size: 0.85rem; }
+        .status-dot {
+            display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px;
+        }
+        .status-dot.ok { background: var(--green); }
+        .status-dot.warning { background: var(--yellow); }
+        .status-dot.error { background: var(--red); }
+        .status-dot.never { background: var(--text-muted); }
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+            gap: 1rem;
+        }
+        .card {
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 1.25rem;
+            transition: border-color 0.2s;
+        }
+        .card:hover { border-color: var(--accent); }
+        .card-header {
+            display: flex; justify-content: space-between; align-items: flex-start;
+            margin-bottom: 0.75rem;
+        }
+        .card-title { font-size: 1rem; font-weight: 600; }
+        .card-ruc { color: var(--text-muted); font-size: 0.8rem; font-family: monospace; }
+        .card-badge {
+            font-size: 0.7rem; padding: 2px 8px; border-radius: 12px; font-weight: 500;
+        }
+        .badge-active { background: #065f46; color: #6ee7b7; }
+        .badge-inactive { background: #7f1d1d; color: #fca5a5; }
+        .stats-row {
+            display: flex; gap: 1rem; margin-top: 0.75rem;
+        }
+        .stat {
+            flex: 1; text-align: center;
+            background: #232738; border-radius: 6px; padding: 0.5rem;
+        }
+        .stat-value { font-size: 1.25rem; font-weight: 700; }
+        .stat-value.downloads { color: var(--green); }
+        .stat-value.errors { color: var(--red); }
+        .stat-label { font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; }
+        .card-footer {
+            margin-top: 0.75rem; padding-top: 0.75rem;
+            border-top: 1px solid var(--border);
+            font-size: 0.75rem; color: var(--text-muted);
+            display: flex; justify-content: space-between;
+        }
+        .alert-badge {
+            background: var(--red); color: white;
+            font-size: 0.7rem; padding: 2px 6px; border-radius: 8px; font-weight: 600;
+        }
+        .refresh {
+            cursor: pointer;
+            color: var(--accent);
+            font-size: 0.85rem;
+            text-decoration: none;
+        }
+        .refresh:hover { text-decoration: underline; }
+        .empty-state {
+            text-align: center; padding: 4rem 2rem;
+            color: var(--text-muted);
+        }
+        .loading { text-align: center; padding: 4rem; color: var(--text-muted); }
+        .error-state { text-align: center; padding: 2rem; color: var(--red); }
+        #last-updated { color: var(--text-muted); font-size: 0.75rem; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div>
+            <h1>📊 Key49-Fetch Dashboard</h1>
+            <span class="version">v0.6.0</span>
+        </div>
+        <div>
+            <span id="last-updated"></span>
+            <a class="refresh" href="javascript:loadData()" style="margin-left: 1rem;">⟳ Refresh</a>
+        </div>
+    </div>
+
+    <div id="content">
+        <div class="loading">⏳ Loading dashboard...</div>
+    </div>
+
+    <script>
+        const API_BASE = window.location.origin;
+
+        function statusClass(status) {
+            if (!status || status === 'never') return 'never';
+            if (status === 'ok') return 'ok';
+            if (status === 'partial') return 'warning';
+            return 'error';
+        }
+
+        function statusLabel(status) {
+            if (!status || status === 'never') return 'Never run';
+            if (status === 'ok') return 'OK';
+            if (status === 'partial') return 'Partial';
+            if (status === 'failed') return 'Failed';
+            return status;
+        }
+
+        function timeAgo(isoString) {
+            if (!isoString) return 'Never';
+            const then = new Date(isoString);
+            const now = new Date();
+            const diff = Math.floor((now - then) / 1000);
+            if (diff < 60) return `${diff}s ago`;
+            if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+            if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+            return `${Math.floor(diff / 86400)}d ago`;
+        }
+
+        function renderCard(c) {
+            const status = c.last_run_status || 'never';
+            const dot = statusClass(status);
+            const consecutive = c.consecutive_failures || 0;
+            const alertBadge = consecutive >= 3
+                ? `<span class="alert-badge">🚨 ${consecutive} failures</span>`
+                : '';
+
+            const types = (c.download_types || []).map(t => {
+                const names = {1:'Factura',2:'Liquidación',3:'NC',4:'ND',6:'Retención'};
+                return names[t] || t;
+            }).join(', ');
+
+            return `
+                <div class="card">
+                    <div class="card-header">
+                        <div>
+                            <div class="card-title">${c.business_name}</div>
+                            <div class="card-ruc">RUC: ${c.ruc}</div>
+                        </div>
+                        <div>
+                            <span class="card-badge ${c.is_active ? 'badge-active' : 'badge-inactive'}">
+                                ${c.is_active ? 'active' : 'inactive'}
+                            </span>
+                            ${alertBadge}
+                        </div>
+                    </div>
+                    <div class="stats-row">
+                        <div class="stat">
+                            <div class="stat-value downloads">${c.total_downloaded || 0}</div>
+                            <div class="stat-label">Downloaded</div>
+                        </div>
+                        <div class="stat">
+                            <div class="stat-value">${c.total_skipped || 0}</div>
+                            <div class="stat-label">Skipped</div>
+                        </div>
+                        <div class="stat">
+                            <div class="stat-value errors">${c.total_errors || 0}</div>
+                            <div class="stat-label">Errors</div>
+                        </div>
+                    </div>
+                    <div class="card-footer">
+                        <span>
+                            <span class="status-dot ${dot}"></span>
+                            ${statusLabel(status)} · ${timeAgo(c.last_run_at)}
+                        </span>
+                        <span>${types} · ${c.schedule || 'daily'}</span>
+                    </div>
+                </div>
+            `;
+        }
+
+        async function loadData() {
+            const content = document.getElementById('content');
+            content.innerHTML = '<div class="loading">⏳ Loading dashboard...</div>';
+
+            try {
+                const resp = await fetch(`${API_BASE}/api/v1/companies`);
+                if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+                const data = await resp.json();
+                const companies = data.companies || [];
+
+                if (companies.length === 0) {
+                    content.innerHTML = '<div class="empty-state">No companies registered yet.<br>Add companies to <code>config/companies.json</code></div>';
+                } else {
+                    content.innerHTML = `<div class="grid">${companies.map(renderCard).join('')}</div>`;
+                }
+
+                document.getElementById('last-updated').textContent =
+                    'Updated: ' + new Date().toLocaleTimeString();
+            } catch (err) {
+                content.innerHTML = `<div class="error-state">Failed to load dashboard.<br><small>${err.message}</small><br><small>Is the API running?</small></div>`;
+            }
+        }
+
+        loadData();
+        // Auto-refresh every 30s
+        setInterval(loadData, 30000);
+    </script>
+</body>
+</html>

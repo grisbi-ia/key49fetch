@@ -85,6 +85,8 @@ class StatsTracker:
                 "last_run_status": s.last_run_status,
                 "last_run_duration_seconds": s.last_run_duration_seconds,
                 "months_processed": s.months_processed,
+                "consecutive_failures": s.consecutive_failures,
+                "last_error": s.last_error,
             }
             for cid, s in self._stats.items()
         }
@@ -125,6 +127,16 @@ class StatsTracker:
         """Record a completed run for a company."""
         stats = self.get_or_create(company_id, ruc, business_name)
         stats.record_run(downloaded, skipped, errors, duration, period)
+        self._save()
+
+    def record_failure(
+        self,
+        company_id: str,
+        error: str,
+    ) -> None:
+        """Record a failed run (after all retries exhausted)."""
+        stats = self.get_or_create(company_id)
+        stats.record_failure(error)
         self._save()
 
     def health_summary(self) -> dict:

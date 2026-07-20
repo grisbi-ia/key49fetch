@@ -1,0 +1,11 @@
+[Unit]
+Description=Key49-Fetch SRI Download Timer (every 6 hours)
+Documentation=https://github.com/auracore/key49-fetch
+
+[Timer]
+OnCalendar=*-*-* 00,06,12,18:15:00
+RandomizedDelaySec=300
+Persistent=true
+
+[Install]
+WantedBy=timers.target

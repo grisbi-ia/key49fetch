@@ -36,81 +36,94 @@
 
 ---
 
-## Phase 2 — Message Queue Integration (v0.3.0)
+## Phase 2 — Scheduler & Partitioning (v0.3.0) ✅ DONE
 
-**Goal**: Decouple job submission from execution via RabbitMQ.
+**Goal**: Schedule periodic downloads and support horizontal scaling via RUC partitioning.
 
-- [ ] RabbitMQ exchange setup (`key49.fetch`, type topic)
-- [ ] Queue `key49.fetch.jobs` (job ingestion)
-- [ ] Queue `key49.fetch.results` (result publication)
-- [ ] Job DTO: `{job_id, company_id, ruc, password, year, month, types, known_keys}`
-- [ ] Result DTO: `{job_id, status, documents[], errors[], summary}`
-- [ ] Worker consumes jobs, publishes results
-- [ ] Job retry + dead-letter queue
-- [ ] Idempotency: same job twice = no duplicate downloads
+- [x] `download_xmls()` returns structured result dict (status + counts)
+- [x] Orchestrator captures real download counts (not hardcoded zeros)
+- [x] `--companies` CLI flag for comma-separated company IDs
+- [x] `COMPANY_FILTER` env var for instance-level partitioning
+- [x] Systemd service + timer units (every 6h, ±5 min jitter)
+- [x] Deployment guide (`deploy/README.md`)
+
+**Architecture decision**: RabbitMQ deferred to Phase 4 (API Gateway).
+Current workload is deterministic — no need for a message broker yet.
+Horizontal scaling = deploy another instance with different `COMPANY_FILTER`.
 
 **Tag**: `v0.3.0`
 
 ---
 
-## Phase 3 — MinIO Storage (v0.4.0)
+## Phase 3 — API Gateway (v0.4.0) ✅ DONE
 
-**Goal**: Store documents in object storage instead of local disk.
+**Goal**: Expose documents via REST API for ERP/web consumption, served directly from filesystem.
 
-- [ ] MinIO client integration (boto3 or minio-py)
-- [ ] Bucket structure: `{bucket}/{company_id}/{year}-{month:02d}/{type:02d}/`
-- [ ] Upload XMLs and PDFs after download
-- [ ] Signed URL generation for external access
-- [ ] Local temp folder cleanup after upload
-- [ ] Configurable: MinIO endpoint, access key, secret key, bucket
-- [ ] Fallback to local storage if MinIO unreachable
+- [x] FastAPI application (`src/api/app.py`)
+- [x] API key authentication via `X-API-Key` header (`src/api/auth.py`)
+- [x] Document scanner with SRI access key metadata extraction (`src/api/documents.py`)
+- [x] `GET /api/v1/health` — Health check
+- [x] `GET /api/v1/companies` — List registered companies
+- [x] `GET /api/v1/documents?company_id=X&year=Y&month=M&type=T` — List documents with pagination
+- [x] `GET /api/v1/documents/{access_key}?company_id=X&...&format=xml|pdf` — Download single file
+- [x] `.env.example` with all configuration options
+- [x] API docs via Swagger UI (`/docs`)
+
+**Architecture decision**: Files stored on local filesystem, served via FastAPI `FileResponse`.
+MinIO deferred — not needed for current scale (single-node, fixed workload).
+Signed URLs can be implemented in the API layer if needed later.
 
 **Tag**: `v0.4.0`
 
 ---
 
-## Phase 4 — API Gateway (v0.5.0)
+## Phase 4 — Webhooks & ERP Integration (v0.5.0) ✅ DONE
 
-**Goal**: Expose documents via REST API for ERP consumption.
+**Goal**: Push notifications to ERPs when new documents arrive.
 
-- [ ] REST API (FastAPI or Quarkus)
-- [ ] `GET /api/v1/companies` — List registered companies
-- [ ] `POST /api/v1/companies` — Register new company
-- [ ] `GET /api/v1/documents?company_id=X&year=Y&month=M&type=T` — List documents
-- [ ] `GET /api/v1/documents/{id}/download` — Download single document (signed URL)
-- [ ] API key authentication
-- [ ] Rate limiting per API consumer
-- [ ] Pagination on list endpoints
+- [x] Configurable webhook URL + secret per company (in `companies.json`)
+- [x] Webhook payload: `{event, company_id, ruc, period, new_documents, total_documents, timestamp}`
+- [x] HMAC-SHA256 signature in `X-Key49-Signature` header
+- [x] Retry failed webhooks (3 attempts, exponential backoff: 2s, 4s, 8s)
+- [x] JSONL audit trail per company: `logs/webhooks/{company_id}.jsonl`
+- [x] ERP integration flow: webhook notifies → ERP calls API for details
 
 **Tag**: `v0.5.0`
 
 ---
 
-## Phase 5 — Webhooks & ERP Integration (v0.6.0)
+## Phase 5 — Scheduling & Automation (v0.6.0) ✅ DONE
 
-**Goal**: Push notifications to ERPs when new documents arrive.
+**Goal**: Fully automated periodic downloads with backfill, failure alerting, and dashboard.
 
-- [ ] Configurable webhook URL per company
-- [ ] Webhook payload: `{company_id, month, new_documents[], timestamp}`
-- [ ] Retry failed webhooks (3 attempts, exponential backoff)
-- [ ] Webhook secret for HMAC signature verification
-- [ ] ERP adapters (Odoo, SAP, custom REST)
-- [ ] Webhook event log / audit trail
+- [x] Historical backfill mode: `--backfill YYYY-MM` downloads all months from start to now
+- [x] Consecutive failure tracking in stats (`consecutive_failures`, `last_error`)
+- [x] Alert webhook when failures exceed threshold (configurable via `ALERT_WEBHOOK_URL`, `ALERT_THRESHOLD`)
+- [x] Alert payload: `{event, company_id, ruc, consecutive_failures, threshold, last_error, severity}`
+- [x] Web dashboard at `/` and `/dashboard` — company cards with status, doc counts, failure alerts
+- [x] Auto-refresh every 30s on dashboard
+- [x] Per-company schedule config already in `companies.json` (Phase 1)
+- [x] Incremental downloads via skip-existing (Phase 0)
+
+**Architecture note**: Scheduling is handled by systemd timer (Phase 2).
+Phase 5 adds operational features: backfill for onboarding, alerting for failures,
+and dashboard for monitoring.
 
 **Tag**: `v0.6.0`
 
 ---
 
-## Phase 6 — Scheduling & Automation (v0.7.0)
+## Phase 6 — Web Admin Interface (v0.7.0)
 
-**Goal**: Fully automated periodic downloads without human intervention.
+**Goal**: Web-based administration panel to manage companies and trigger downloads.
 
-- [ ] Cron-based scheduler (or `@Scheduled` in Quarkus)
-- [ ] Per-company schedule config (daily, weekly, custom)
-- [ ] Current-month incremental downloads (only new documents)
-- [ ] Historical backfill mode (download past months on first registration)
-- [ ] Alerting on repeated failures (Slack/Telegram webhook or email)
-- [ ] Dashboard: company status, last download, document counts
+- [ ] `POST /api/v1/companies` — Add/register new company via API
+- [ ] `PUT /api/v1/companies/{id}` — Edit company (RUC, password, types, webhook)
+- [ ] `DELETE /api/v1/companies/{id}` — Deactivate company
+- [ ] `POST /api/v1/fetch` — Trigger download for a specific company/month
+- [ ] Admin UI at `/admin` — Forms for company CRUD, download triggers, backfill
+- [ ] Auth separation: admin panel uses separate admin API key
+- [ ] Activity log: who triggered what and when
 
 **Tag**: `v0.7.0`
 

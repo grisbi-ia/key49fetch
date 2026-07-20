@@ -32,6 +32,8 @@ class CompanyConfig:
     download_types: list[int] = field(default_factory=lambda: [1, 6])
     schedule: str = "daily"
     proxy_profile: Optional[str] = None
+    webhook_url: Optional[str] = None
+    webhook_secret: Optional[str] = None
 
     def __post_init__(self) -> None:
         if not self.ruc or len(self.ruc) != 13:
@@ -78,6 +80,8 @@ class CompanyManager:
                 download_types=raw.get("download_types", [1, 6]),
                 schedule=raw.get("schedule", "daily"),
                 proxy_profile=raw.get("proxy_profile"),
+                webhook_url=raw.get("webhook_url"),
+                webhook_secret=raw.get("webhook_secret"),
             )
             self._companies[company.company_id] = company
 
@@ -139,6 +143,8 @@ class CompanyManager:
                 "download_types": c.download_types,
                 "schedule": c.schedule,
                 "proxy_profile": c.proxy_profile,
+                "webhook_url": c.webhook_url,
+                "webhook_secret": c.webhook_secret,
             })
 
         self._config_path.parent.mkdir(parents=True, exist_ok=True)
