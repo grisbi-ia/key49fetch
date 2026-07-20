@@ -14,19 +14,9 @@ ExecStart=/opt/key49-fetch/.venv/bin/python -m src.orchestrator \
     --config /opt/key49-fetch/config/companies.json \
     --output /data/key49-fetch/xml_downloads
 
-# Security hardening
-NoNewPrivileges=yes
-PrivateTmp=yes
-ProtectSystem=strict
-ProtectHome=yes
-ReadWritePaths=/data/key49-fetch /opt/key49-fetch/config /opt/key49-fetch/logs
-ReadOnlyPaths=/opt/key49-fetch
-
-# Resource limits
 MemoryMax=1G
 CPUQuota=200%
 
-# Logging
 StandardOutput=journal
 StandardError=journal
 SyslogIdentifier=key49-fetch
