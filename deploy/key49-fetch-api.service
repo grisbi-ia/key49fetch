@@ -18,7 +18,7 @@ ExecStart=/opt/key49-fetch/.venv/bin/python -m src.api.app
 Restart=on-failure
 RestartSec=5
 
-MemoryMax=256M
+MemoryMax=2G
 CPUQuota=100%
 
 StandardOutput=journal
