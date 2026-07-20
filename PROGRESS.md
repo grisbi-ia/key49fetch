@@ -1,6 +1,17 @@
 # Key49-Fetch — Progress Log
 
-> Last updated: 2026-07-17
+> Last updated: 2026-07-20 (deployment tested on Contabo, ready for Ecuador IP)
+
+---
+
+## Deployment Notes (2026-07-20)
+
+- ✅ Full stack deployed on Linux (systemd, FastAPI, Playwright/Firefox)
+- ✅ API tested: health, companies, fetch, documents, dashboard
+- ⚠️  **Datacenter IPs (Contabo) block SRI Keycloak redirects** — must use Ecuador IP
+- ⚠️  SRI account locked after 5 failed Keycloak attempts on Contabo
+- ✅ Deployment guide: `DEPLOY.md` (battle-tested)
+- ✅ Install script: `install.sh` (single command)
 
 ---
 

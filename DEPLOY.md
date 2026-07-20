@@ -10,6 +10,7 @@
 - Python 3.9+
 - Git
 - Acceso a `github.com` (repositorio privado) y `srienlinea.sri.gob.ec`
+- **IP residencial ecuatoriana** (datacenter IPs como Contabo/Hetzner son bloqueadas por el SRI)
 - **Todo se ejecuta como `root`**
 
 ---
