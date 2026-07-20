@@ -590,20 +590,30 @@ async def download_xmls(
             print(f"{'═' * 60}")
 
             # ── Navegar a Comprobantes Recibidos (vía menú — como humano) ─
-            print("📂 Navegando a Comprobantes Electrónicos Recibidos por menú...")
-            # Primero ir al perfil (página neutral) para limpiar estado JSF
-            await page.goto(
-                "https://srienlinea.sri.gob.ec/sri-en-linea/contribuyente/perfil",
-                wait_until="domcontentloaded", timeout=45000
+            print("📂 Navegando a Comprobantes Electrónicos Recibidos...")
+            # Ir directo a la página de comprobantes (sin pasar por perfil — evita pérdida de sesión)
+            COMPROBANTES_URL = (
+                "https://srienlinea.sri.gob.ec/comprobantes-electronicos-internet/"
+                "pages/consultas/recibidos/comprobantesRecibidos.jsf"
             )
-            human_delay(2, 4)
-            # Luego navegar al módulo de comprobantes recibidos
-            MODULE_URL = (
-                "https://srienlinea.sri.gob.ec/tuportal-internet/"
-                "accederAplicacion.jspa?redireccion=57&idGrupo=55"
-            )
-            await page.goto(MODULE_URL, wait_until="domcontentloaded", timeout=45000)
+            await page.goto(COMPROBANTES_URL, wait_until="domcontentloaded", timeout=45000)
             human_delay(3, 5)
+
+            # Si la sesión expiró, Keycloak redirige al login.
+            # En ese caso, ir por el menú tradicional.
+            if "auth/realms" in page.url or "openid-connect" in page.url:
+                print("   🔄 Sesión no detectada, navegando por menú tradicional...")
+                await page.goto(
+                    "https://srienlinea.sri.gob.ec/sri-en-linea/contribuyente/perfil",
+                    wait_until="domcontentloaded", timeout=45000
+                )
+                human_delay(2, 4)
+                MODULE_URL = (
+                    "https://srienlinea.sri.gob.ec/tuportal-internet/"
+                    "accederAplicacion.jspa?redireccion=57&idGrupo=55"
+                )
+                await page.goto(MODULE_URL, wait_until="domcontentloaded", timeout=45000)
+                human_delay(3, 5)
             
             # Verificar si hay página intermedia de redirección (j_security_check)
             try:
@@ -823,19 +833,26 @@ async def download_xmls(
                         print("   ⚠️  No se encontró botón de búsqueda")
 
             async def reload_and_fill():
-                """Recarga la página vía menú (como humano) y re-llena el formulario."""
-                # Ir al perfil primero
+                """Recarga la página de comprobantes y re-llena el formulario."""
+                # Ir directo a la página de comprobantes
                 await page.goto(
-                    "https://srienlinea.sri.gob.ec/sri-en-linea/contribuyente/perfil",
-                    wait_until="domcontentloaded", timeout=30000
-                )
-                human_delay(2, 3)
-                # Navegar al módulo
-                await page.goto(
-                    "https://srienlinea.sri.gob.ec/tuportal-internet/accederAplicacion.jspa?redireccion=57&idGrupo=55",
+                    "https://srienlinea.sri.gob.ec/comprobantes-electronicos-internet/"
+                    "pages/consultas/recibidos/comprobantesRecibidos.jsf",
                     wait_until="domcontentloaded", timeout=45000
                 )
                 human_delay(3, 5)
+                # Si volvió al login, intentar por menú
+                if "auth/realms" in page.url or "openid-connect" in page.url:
+                    await page.goto(
+                        "https://srienlinea.sri.gob.ec/sri-en-linea/contribuyente/perfil",
+                        wait_until="domcontentloaded", timeout=30000
+                    )
+                    human_delay(2, 3)
+                    await page.goto(
+                        "https://srienlinea.sri.gob.ec/tuportal-internet/accederAplicacion.jspa?redireccion=57&idGrupo=55",
+                        wait_until="domcontentloaded", timeout=45000
+                    )
+                    human_delay(3, 5)
                 # Scroll natural
                 for _ in range(random.randint(1, 3)):
                     await page.mouse.wheel(0, random.randint(80, 300))
