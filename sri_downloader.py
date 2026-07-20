@@ -561,21 +561,6 @@ async def download_xmls(
 
             await page.wait_for_load_state("networkidle")
             human_delay(2, 4)
-
-            # Esperar activamente a que termine la redirección Keycloak → SRI
-            print("   ⏳ Esperando redirección post-login...")
-            for _ in range(20):  # hasta 60s
-                await page.wait_for_timeout(3000)
-                url = page.url
-                if "tuportal-internet" in url and "accederAplicacion" not in url:
-                    break
-                if "comprobantesRecibidos.jsf" in url:
-                    break
-                if "sri-en-linea" in url:
-                    break
-                print(f"      ... {url[-60:]}")
-            await page.wait_for_load_state("networkidle")
-            print(f"   ✅ Login completado → {page.url[-60:]}")
         else:
             print("   Inicia sesión con tu RUC y clave en el navegador.")
             print("   ⏳ Esperando login manual...")
@@ -1272,17 +1257,6 @@ async def download_xmls(
                         continue
                 await page.wait_for_load_state("networkidle")
                 human_delay(2, 4)
-                # Esperar redirección Keycloak → SRI
-                for _ in range(20):
-                    await page.wait_for_timeout(3000)
-                    url = page.url
-                    if "tuportal-internet" in url and "accederAplicacion" not in url:
-                        break
-                    if "comprobantesRecibidos.jsf" in url:
-                        break
-                    if "sri-en-linea" in url:
-                        break
-                await page.wait_for_load_state("networkidle")
                 print("   ✅ Re-login exitoso")
 
         print(f"\n{'═' * 60}")
