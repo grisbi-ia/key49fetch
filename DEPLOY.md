@@ -1,154 +1,89 @@
-# Key49-Fetch — Guía de Despliegue y Primeros RUCs
+# Key49-Fetch — Guía de Despliegue
 
-> Última actualización: 2026-07-17 | Versión: v0.6.0
-
----
-
-## 1. Requisitos del servidor
-
-| Componente | Mínimo |
-|-----------|--------|
-| OS | Linux (Ubuntu 22.04+ recomendado) |
-| RAM | 2 GB (Firefox headless ~500 MB por ejecución) |
-| Disco | 5 GB |
-| Python | 3.10+ |
-| Red | Acceso a `srienlinea.sri.gob.ec` |
+> Probado en producción — Julio 2026 | Versión: v0.6.0
 
 ---
 
-## 2. Instalación rápida (script automático)
+## 1. Requisitos
 
-Como **root**, copia y ejecuta el script:
-
-```bash
-# En tu servidor, como root:
-curl -O https://raw.githubusercontent.com/grisbi-ia/key49fetch/master/install.sh
-chmod +x install.sh
-./install.sh
-```
-
-El script hace todo: crea usuario `app`, clona repo, instala dependencias, configura systemd, y arranca la API.
-
-Saltar a [sección 5](#5-primera-descarga-bajo-demanda) para la primera descarga.
-
-### 2.1. Alternativa: subir sin Git (tar.gz)
-
-Si el servidor no tiene Git o no quieres clonar el repo:
-
-**En tu máquina local:**
-
-```bash
-cd /ruta/a/key49fetch
-
-# Excluir lo que no se necesita en producción
-tar -czf key49fetch.tar.gz \
-    --exclude='.venv' \
-    --exclude='.git' \
-    --exclude='__pycache__' \
-    --exclude='*.pyc' \
-    --exclude='bot_descargas_v2' \
-    --exclude='*.tar.gz' \
-    --exclude='xml_downloads' \
-    --exclude='logs' \
-    --exclude='cookies' \
-    .
-
-# Subir al servidor (el método que prefieras):
-scp key49fetch.tar.gz root@TU_SERVIDOR:/opt/
-```
-
-**En el servidor, como root:**
-
-```bash
-cd /opt
-tar -xzf key49fetch.tar.gz -C key49fetch
-cd key49fetch
-
-# Crear usuario de servicio
-# No se necesita usuario adicional — todo corre como root 2>/dev/null || true
-
-# Crear directorio de datos
-mkdir -p /data/key49-fetch/xml_downloads
-
-# Entorno virtual
-python3 -m venv .venv
-.venv/bin/pip install -r requirements.txt
-.venv/bin/playwright install firefox
-
-# Generar FERNET_KEY
-.venv/bin/python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
-# Copiar el resultado y crear .env (ver sección 4)
-
-# Permisos
-# Sin permisos especiales — root es dueño de todo /opt/key49-fetch /data/key49-fetch
-
-# Instalar servicios
-cp deploy/key49-fetch.service /etc/systemd/system/
-cp deploy/key49-fetch.timer /etc/systemd/system/
-cp deploy/key49-fetch-api.service /etc/systemd/system/
-systemctl daemon-reload
-systemctl enable --now key49-fetch-api.service
-systemctl enable --now key49-fetch.timer
-```
+- Linux (Ubuntu/Debian)
+- Python 3.9+
+- Git
+- Acceso a `github.com` (repositorio privado) y `srienlinea.sri.gob.ec`
+- **Todo se ejecuta como `root`**
 
 ---
 
-## 3. Instalación manual (paso a paso)
+## 2. Configurar acceso SSH a GitHub
 
-Si prefieres control total, sigue estos pasos como **root**:
+El repositorio es privado. Hay que generar una llave SSH y agregarla como **deploy key**.
 
 ```bash
-# ─── 3.1. Crear usuario de servicio ────────────────────────────
-# No se necesita usuario adicional — todo corre como root
+# Generar llave (solo una vez)
+ssh-keygen -t ed25519 -C "key49-fetch-server" -f ~/.ssh/id_ed25519 -N ""
 
-# ─── 3.2. Crear directorios ────────────────────────────────────
-mkdir -p /opt/key49-fetch /data/key49-fetch/xml_downloads
+# Mostrar llave pública (copiar todo el contenido)
+cat ~/.ssh/id_ed25519.pub
+```
 
-# ─── 3.3. Clonar repositorio ──────────────────────────────────
+1. Ir a: `https://github.com/grisbi-ia/key49fetch/settings/keys`
+2. **Add deploy key** → título: `servidor` → pegar la llave → ✅ Allow write access → **Add key**
+3. Verificar: `ssh -T git@github.com` (debe responder "Hi grisbi-ia...")
+
+---
+
+## 3. Instalación
+
+```bash
+# Clonar
 cd /opt
 git clone git@github.com:grisbi-ia/key49fetch.git
 cd key49-fetch
 
-# ─── 3.4. Entorno virtual ──────────────────────────────────────
+# Entorno virtual
 python3 -m venv .venv
 .venv/bin/pip install -r requirements.txt
 
-# ─── 3.5. Instalar Firefox para Playwright ────────────────────
-.venv/bin/playwright install firefox
-# Si falla por dependencias del sistema:
-# .venv/bin/playwright install-deps firefox
-# .venv/bin/playwright install firefox
+# Dependencias del sistema para Firefox
+apt-get install -y libxcb-shm0 libx11-xcb1 libxrandr2 libxcomposite1 \
+    libxcursor1 libxdamage1 libxi6 libxfixes3 libgtk-3-0 \
+    libpangocairo-1.0-0 libpango-1.0-0 libatk1.0-0 \
+    libcairo-gobject2 libcairo2 libgdk-pixbuf-2.0-0 \
+    libxrender1 libasound2
 
-# ─── 3.6. Permisos ─────────────────────────────────────────────
-# Sin permisos especiales — root es dueño de todo /opt/key49-fetch /data/key49-fetch
+# Instalar Firefox para Playwright
+.venv/bin/playwright install firefox
 ```
 
 ---
 
-## 4. Configuración
+## 4. Configurar .env
 
 ```bash
-# ─── 4.1. Generar FERNET_KEY ──────────────────────────────────
 cd /opt/key49-fetch
-.venv/bin/python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
-# Copiar el resultado ↓
 
-# ─── 4.2. Crear .env ───────────────────────────────────────────
+# Generar llave de encriptación para contraseñas SRI
+.venv/bin/python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+# Copiar el resultado
+
+# Crear .env
 cat > .env <<EOF
-FERNET_KEY=la-clave-generada-arriba
+FERNET_KEY=LA_CLAVE_GENERADA_ARRIBA
 KEY49_API_PORT=8081
 KEY49_OUTPUT_DIR=/data/key49-fetch/xml_downloads
 ENABLE_DOCS=1
-# API_KEYS=clave-api-1,clave-api-2
-# ALERT_WEBHOOK_URL=https://hooks.slack.com/...
-# ALERT_THRESHOLD=3
 EOF
-
-# ─── 4.3. Registrar RUCs ──────────────────────────────────────
-nano config/companies.json
 ```
 
-### Formato de companies.json
+> ⚠️ Sin `FERNET_KEY`, las contraseñas SRI se guardan en texto plano. Guarda esta clave en un lugar seguro.
+
+---
+
+## 5. Registrar empresas
+
+```bash
+nano config/companies.json
+```
 
 ```json
 [
@@ -167,156 +102,114 @@ nano config/companies.json
 ]
 ```
 
-### Tipos de documento (`download_types`)
+| Campo | Notas |
+|-------|-------|
+| `ruc` | 10 dígitos (cédula) o 13 (RUC). Si pones 10, se auto-completa a 13 |
+| `download_types` | 1=Factura, 2=Liquidación, 3=NC, 4=ND, 6=Retención |
+| `webhook_url` | Opcional. URL donde notificar documentos nuevos |
 
-| Código | Nombre |
-|--------|--------|
-| 1 | Factura |
-| 2 | Liquidación de compra |
-| 3 | Notas de Crédito |
-| 4 | Notas de Débito |
-| 6 | Comprobante de Retención |
+> Para agregar/quitar empresas **no hay que reiniciar nada**. Se lee del archivo en cada ejecución.
 
 ---
 
-## 5. Primera descarga (bajo demanda)
-
-> ⚠️ Registrar un RUC NO dispara descargas automáticas.
-> La primera descarga debe solicitarse manualmente vía API o CLI.
-
-### 5.1. Vía API (recomendado)
+## 6. Instalar servicios systemd
 
 ```bash
-# Asegúrate que la API esté corriendo (ver sección 7)
-curl -X POST "http://localhost:8081/api/v1/fetch?company_id=0190411826001"
-
-# Respuesta:
-# {"job_id":"a3f2c8e1","status":"pending","message":"Download started..."}
-
-# Consultar estado:
-curl "http://localhost:8081/api/v1/fetch/a3f2c8e1"
-```
-
-### 5.2. Vía CLI (alternativa)
-
-```bash
-cd /opt/key49-fetch
-.venv/bin/python -m src.orchestrator \
-    --companies 0190411826001 \
-    --year 2026 --month 7
-
-# Backfill (varios meses):
-.venv/bin/python -m src.orchestrator \
-    --companies 0190411826001 \
-    --backfill 2026-01
-```
-
----
-
-## 6. Verificar resultados
-
-```bash
-# ─── 6.1. Archivos descargados ─────────────────────────────────
-find /data/key49-fetch/xml_downloads -type f | head -20
-# xml_downloads/0190411826001/07/01/0401202601...123.xml
-# xml_downloads/0190411826001/07/01/0401202601...123.pdf
-
-# ─── 6.2. Estadísticas ─────────────────────────────────────────
-cat /opt/key49-fetch/config/stats.json | python3 -m json.tool
-
-# ─── 6.3. Logs por empresa ─────────────────────────────────────
-tail -50 /opt/key49-fetch/logs/0190411826001.log
-```
-
----
-
-## 7. Activar servicios (systemd)
-
-```bash
-# ─── 7.1. Instalar units ──────────────────────────────────────
-cd /opt/key49-fetch
+cp deploy/key49-fetch-api.service /etc/systemd/system/
 cp deploy/key49-fetch.service /etc/systemd/system/
 cp deploy/key49-fetch.timer /etc/systemd/system/
-cp deploy/key49-fetch-api.service /etc/systemd/system/
 systemctl daemon-reload
-
-# ─── 7.2. Activar API Gateway ─────────────────────────────────
-systemctl enable --now key49-fetch-api.service
-# API disponible en http://IP:8081/
-
-# ─── 7.3. Activar timer de descargas ──────────────────────────
-systemctl enable --now key49-fetch.timer
-# Descargas automáticas cada 6 horas
-
-# ─── 7.4. Verificar ───────────────────────────────────────────
-systemctl status key49-fetch-api.service
-systemctl status key49-fetch.timer
-systemctl list-timers key49-fetch.timer
 ```
 
 ---
 
-## 8. Probar API
+## 7. Arrancar
 
 ```bash
-# Health
-curl http://localhost:8081/api/v1/health
+# API Gateway (siempre corriendo)
+systemctl enable --now key49-fetch-api.service
 
-# Listar empresas
-curl http://localhost:8081/api/v1/companies
+# Timer de descargas (cada 6 horas: 00:15, 06:15, 12:15, 18:15)
+systemctl enable --now key49-fetch.timer
+```
 
-# Listar documentos
+Verificar:
+
+```bash
+systemctl status key49-fetch-api.service    # active (running)
+systemctl status key49-fetch.timer          # active (waiting)
+curl -s http://localhost:8081/api/v1/health # {"status":"ok"}
+```
+
+---
+
+## 8. Primera descarga (manual)
+
+> Las descargas **no** son automáticas al registrar una empresa. Hay que dispararlas manualmente.
+
+```bash
+# Disparar descarga del mes corriente
+curl -X POST "http://localhost:8081/api/v1/fetch?company_id=0190411826001"
+
+# Ver estado del job
+curl "http://localhost:8081/api/v1/fetch"
+
+# Listar documentos descargados
 curl "http://localhost:8081/api/v1/documents?company_id=0190411826001&year=2026&month=7"
 
-# Descargar un XML
-curl "http://localhost:8081/api/v1/documents/{clave_acceso}?company_id=0190411826001&year=2026&month=7&type=1&format=xml" -o factura.xml
-
-# Dashboard web: abrir http://IP:8081/ en navegador
+# Backfill (varios meses de una vez, vía CLI):
+cd /opt/key49-fetch
+.venv/bin/python -m src.orchestrator --companies 0190411826001 --backfill 2026-01
 ```
 
 ---
 
-## 9. Escalar horizontalmente
-
-Si tienes muchos RUCs, despliega instancias adicionales:
+## 9. Actualizar
 
 ```bash
-# Instancia 2 (otro servidor)
-# Mismos pasos 2-3, pero en .env agregar:
-echo "COMPANY_FILTER=0992156406001,1790012345001" >> .env
+cd /opt/key49-fetch
+git pull origin master
+.venv/bin/pip install -q -r requirements.txt
+systemctl restart key49-fetch-api.service
 ```
 
-Cada instancia opera independiente. Sin coordinación entre ellas.
+---
+
+## 10. Endpoints
+
+| Método | Ruta | Descripción |
+|--------|------|-------------|
+| `GET` | `/` | Dashboard web |
+| `GET` | `/docs` | Swagger UI |
+| `GET` | `/api/v1/health` | Health check |
+| `GET` | `/api/v1/companies` | Lista empresas |
+| `GET` | `/api/v1/documents?company_id=X&year=Y&month=M` | Lista documentos |
+| `GET` | `/api/v1/documents/{clave}?company_id=X&...&format=xml\|pdf` | Descarga archivo |
+| `POST` | `/api/v1/fetch?company_id=X` | Dispara descarga |
+| `GET` | `/api/v1/fetch/{job_id}` | Estado del job |
+| `GET` | `/api/v1/fetch` | Lista jobs recientes |
 
 ---
 
-## 10. Troubleshooting
+## 11. Troubleshooting
 
-| Problema | Causa | Solución |
-|----------|-------|----------|
-| `Connection refused` al SRI | IP baneada o sin acceso | Verificar conectividad a srienlinea.sri.gob.ec |
-| reCAPTCHA rechazado | IP con mala reputación | Esperar 1-2h entre ejecuciones |
-| `No such file: companies.json` | Ruta incorrecta | Ejecutar desde `/opt/key49-fetch` |
-| `FERNET_KEY not set` | Falta .env | Ver sección 4 |
-| Tabla vacía (sin error) | No hay comprobantes ese mes | Normal |
-| `Playwright: browser not found` | Firefox no instalado | `.venv/bin/playwright install firefox` |
-| API no arranca | Puerto ocupado | Cambiar `KEY49_API_PORT` en .env |
-| Dashboard en blanco | API no corriendo | `systemctl status key49-fetch-api` |
+| Error | Causa | Solución |
+|-------|-------|----------|
+| `status=226/NAMESPACE` | Restricciones systemd | `git pull` (ya corregido) |
+| `Failed to load environment files` | Falta `.env` | Crear `.env` con `FERNET_KEY` (sección 4) |
+| `status=203/EXEC` | No existe `.venv` | Crear venv e instalar deps (sección 3) |
+| `missing dependencies to run browsers` | Faltan libs del sistema | `apt-get install` librerías (sección 3) |
+| `git@github.com: Permission denied` | Sin llave SSH | Configurar deploy key (sección 2) |
+| API no arranca / puerto ocupado | Conflicto | Cambiar `KEY49_API_PORT` en `.env` |
 
 ---
 
-## 11. Monitoreo diario
+## 12. Monitoreo
 
 ```bash
-# Health check
-cd /opt/key49-fetch && .venv/bin/python -m src.orchestrator --health
-
-# Dashboard web
-# Abrir http://IP:8081/
-
-# Últimos logs
-journalctl -u key49-fetch.service --since "6 hours ago"
-
-# Auditoría de webhooks
-cat /opt/key49-fetch/logs/webhooks/*.jsonl | python3 -m json.tool
+# Dashboard: http://IP-DEL-SERVIDOR:8081/
+# Health: curl http://localhost:8081/api/v1/health
+# Logs: journalctl -u key49-fetch-api.service -f
+# Stats: cat /opt/key49-fetch/config/stats.json | python3 -m json.tool
+# Webhooks: cat /opt/key49-fetch/logs/webhooks/*.jsonl
 ```
