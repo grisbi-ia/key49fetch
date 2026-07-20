@@ -9,6 +9,7 @@ Type=simple
 User=root
 Group=root
 WorkingDirectory=/opt/key49-fetch
+Environment="HOME=/root"
 EnvironmentFile=/opt/key49-fetch/.env
 ExecStart=/opt/key49-fetch/.venv/bin/python -m src.api.app
 

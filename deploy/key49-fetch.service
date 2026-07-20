@@ -9,6 +9,7 @@ Type=oneshot
 User=root
 Group=root
 WorkingDirectory=/opt/key49-fetch
+Environment="HOME=/root"
 EnvironmentFile=/opt/key49-fetch/.env
 ExecStart=/opt/key49-fetch/.venv/bin/python -m src.orchestrator \
     --config /opt/key49-fetch/config/companies.json \
