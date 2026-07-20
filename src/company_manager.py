@@ -36,8 +36,11 @@ class CompanyConfig:
     webhook_secret: Optional[str] = None
 
     def __post_init__(self) -> None:
-        if not self.ruc or len(self.ruc) != 13:
-            raise ValueError(f"Invalid RUC: {self.ruc}")
+        if not self.ruc or len(self.ruc) not in (10, 13):
+            raise ValueError(f"Invalid RUC (must be 10 or 13 digits): {self.ruc}")
+        if len(self.ruc) == 10:
+            # Auto-pad cédula to RUC format (cédula + 001)
+            self.ruc = self.ruc + "001"
         if not self.sri_password_encrypted:
             raise ValueError("SRI password is required")
 

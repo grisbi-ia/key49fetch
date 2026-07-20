@@ -224,7 +224,7 @@ async def download_document(
     year: int = Query(..., ge=2000, le=2099, description="Year (YYYY)"),
     month: int = Query(..., ge=1, le=12, description="Month (1-12)"),
     type: int = Query(..., ge=1, le=99, description="Document type"),
-    format: str = Query("xml", regex="^(xml|pdf)$", description="File format: xml or pdf"),
+    format: str = Query("xml", pattern="^(xml|pdf)$", description="File format: xml or pdf"),
     api_key: str = Depends(verify_api_key),
 ):
     """Download a specific document file (XML or PDF).

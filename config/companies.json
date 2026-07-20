@@ -1,9 +1,21 @@
 [
     {
-        "company_id": "0195160252001",
-        "ruc": "0195160252001",
-        "business_name": "AuraCore Systems",
-        "sri_password_encrypted": "AuraSRI2025#",
+        "company_id": "0190411826001",
+        "ruc": "0190411826001",
+        "business_name": "Empresa Test 1",
+        "sri_password_encrypted": "password_sri_1",
+        "is_active": true,
+        "download_types": [1, 6],
+        "schedule": "daily",
+        "proxy_profile": null,
+        "webhook_url": null,
+        "webhook_secret": null
+    },
+    {
+        "company_id": "1103875439",
+        "ruc": "1103875439",
+        "business_name": "Nueva Empresa Pato",
+        "sri_password_encrypted": "Pato2024valaSRI#",
         "is_active": true,
         "download_types": [1, 6],
         "schedule": "daily",
